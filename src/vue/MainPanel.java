@@ -4,6 +4,8 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.util.ArrayList;
+import java.util.Iterator;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -23,10 +25,19 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
+import model.Item;
 import controleur.Controleur;
+import controleur.ControleurTest;
 
 public class MainPanel extends JFrame{
 
+	//##############################################################################################
+	//						Attribut Model
+	//##############################################################################################
+
+	Item itemSelected = new Item();
+	ArrayList<Item> listItems = new ArrayList();
+	
 	//##############################################################################################
 	//							Variable d'environment graphique
 	//##############################################################################################
@@ -49,9 +60,8 @@ public class MainPanel extends JFrame{
 
 	private JComboBox<String> encanBox= new JComboBox<String>();
 	
-	private ButtonGroup groupOpenClose = new ButtonGroup();
 	private JRadioButton fermeRadio = new JRadioButton("Fermé"),
-						ouvertRadio = new JRadioButton("Ouvert");
+						payeRadio = new JRadioButton("Payé");
 	
 	private JTextField 	noUniqueTextField = new JTextField(),
 					 	noItemTextField = new JTextField(),
@@ -64,14 +74,14 @@ public class MainPanel extends JFrame{
 	
 	private JTextArea  descriptionTextField = new JTextArea("");
 	
-	private Dimension 	dimLabelShort = new Dimension(40,15),
-						dimLabelMedium = new Dimension(80,15),
-						dimLabelLong = new Dimension(80,15);
+	private Dimension 	dimLabelShort = new Dimension(40,20),
+						dimLabelMedium = new Dimension(80,20),
+						dimLabelLong = new Dimension(80,20);
 	
 
 	private JPanel conteneur = new JPanel();
 	private final int espacementX =15, espacementY=15;
-	private Controleur controleur = new Controleur();
+	private ControleurTest controleur = new ControleurTest();
 	
 	//##############################################################################################
 	//					CONSTRUCTEUR
@@ -82,14 +92,22 @@ public class MainPanel extends JFrame{
 		
 		this.setTitle("Box Layout");
 		this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		this.setSize(600, 400);
+		this.setSize(600, 430);
 		this.setResizable(false);
 
+		this.listItems = controleur.getAllItem();
+		
 		conteneur.setLayout(new BoxLayout(conteneur, BoxLayout.PAGE_AXIS));
 		conteneur.add(initTabItemPanel());
 		conteneur.add(initIdentificationItemPanel());
 		conteneur.add(initInfoItemPanel());
 		conteneur.add(initButtonControlPanel());
+
+		if(!this.listItems.isEmpty()){
+			this.itemSelected = this.listItems.get(0);
+			this.updateDataView(this.itemSelected);
+		}
+
 		this.setContentPane(this.conteneur);
 
 		initLookFeelOS();
@@ -102,27 +120,28 @@ public class MainPanel extends JFrame{
 
 	private JPanel initTabItemPanel(){
 		JPanel tabItemPanel= new JPanel();
-		tabItemPanel.setPreferredSize(new Dimension(this.getWidth(),200));
+		tabItemPanel.setPreferredSize(new Dimension(this.getWidth(),220));
 		tabItemPanel.setLayout(new BoxLayout(tabItemPanel, BoxLayout.PAGE_AXIS));
 		
 		JLabel itemLabel = new JLabel("Items : ");
 		itemLabel.setAlignmentX(0);
 		tabItemPanel.add(itemLabel);
 		
+
+		Object[][] data = new Object[listItems.size()][5];
+		if(!this.listItems.isEmpty()){
+			int i=0;
+			for (Item item : listItems) {
+				data[i] = item.getIdentificationInfo();
+				System.out.println(data[i]);
+				i++;
+			}
+		}
 		
-		Object[][] data = {
-			{"1", "Encans des fous", "1","Roue en alliage Audi", "1000"},
-			{"1", "Encans des fous", "1","Roue en alliage Audi", "1000"},
-			{"1", "Encans des fous", "1","Roue en alliage Audi", "1000"},
-			{"1", "Encans des fous", "1","Roue en alliage Audi", "1000"},
-			{"1", "Encans des fous", "1","Roue en alliage Audi", "1000"},
-			{"1", "Encans des fous", "1","Roue en alliage Audi", "1000"},
-			{"1", "Encans des fous", "1","Roue en alliage Audi", "1000"},
-			{"1", "Encans des fous", "1","Roue en alliage Audi", "1000"}
-		};
 		String title[] = {"No unique", "Encan", "No","Titre","Valeur"};
 		itemTable = new JTable(data, title);
-
+		
+		
 		tabItemPanel.add(new JScrollPane(this.itemTable));
 
 		return tabItemPanel;
@@ -190,10 +209,9 @@ public class MainPanel extends JFrame{
 		
 		JPanel comboPanel = new JPanel();
 		comboPanel.setLayout(new BoxLayout(comboPanel, BoxLayout.LINE_AXIS));
-		groupOpenClose.add(fermeRadio);
-		groupOpenClose.add(ouvertRadio);
 		comboPanel.add(fermeRadio);
-		comboPanel.add(ouvertRadio);
+		comboPanel.add(Box.createRigidArea(new Dimension(30,0)));
+		comboPanel.add(payeRadio);
 		
 		centerBoxPanel.add(comboPanel);
 		centerBoxPanel.add(Box.createRigidArea(new Dimension(0,10)));
@@ -235,6 +253,14 @@ public class MainPanel extends JFrame{
 		controlItem.add(annulerButton);
 		controlItem.add(okButton);
 		controlItem.add(quitterButton);
+		
+		rechercherButton.setEnabled(true);
+		ajouterButton.setEnabled(true);
+		updateButton.setEnabled(false);
+		purgerButton.setEnabled(true);
+		annulerButton.setEnabled(false);
+		okButton.setEnabled(false);
+		quitterButton.setEnabled(true);
 		
 		rechercherButton.addActionListener(new ButtonsHandler());
 		ajouterButton.addActionListener(new ButtonsHandler());
@@ -284,40 +310,122 @@ public class MainPanel extends JFrame{
 	//					CONCTRUIT PANNEAU LABEL + TEXTFIELD
 	//##############################################################################################
 
+
 	public class ButtonsHandler implements ActionListener{
-		
+		Item item;
 		@Override
 		public void actionPerformed(ActionEvent e) {
 			switch(((JButton)e.getSource()).getText()){
 				case "GO" : 
 					controleur.finditem();
 					break;
+					
 				case "Recherche" : 	
-					controleur.recherche();
+					controleur.finditem();
 					break;
+					
 				case "Ajouter" : 
-					controleur.ajout();
+					
+					rechercherButton.setEnabled(false);
+					ajouterButton.setEnabled(false);
+					updateButton.setEnabled(false);
+					purgerButton.setEnabled(false);
+					annulerButton.setEnabled(true);
+					okButton.setEnabled(true);
+					
 					break;
+					
 				case "Supprimer" : 
-					controleur.supprime();
+					controleur.supprimeItem(0);
 					break;
+					
 				case "Mettre à jour" : 
-					controleur.update();
+					controleur.updateItem(getDataView());
 					break;
+					
 				case "Purger" : 
-					controleur.purger();
+					controleur.purgeItems();
 					break;
+					
 				case "Annuler" : 
+					updateDataView(itemSelected);
+							
+					rechercherButton.setEnabled(true);
+					ajouterButton.setEnabled(true);
+					updateButton.setEnabled(false);
+					purgerButton.setEnabled(false);
+					annulerButton.setEnabled(false);
+					okButton.setEnabled(false);
+					
 					break;
+					
 				case "OK" : 
+					controleur.ajoutItem(getDataView());
 					break;
-				case "Quitter" : 
+					
+				case "Quitter" :
+					System.exit(0);	
 					break;
 			}
 		}
 	}
 	
 	
+	//##########################################################################################################	
+	//								DATA - VIEW
+	//##########################################################################################################
+	
+
+	private void updateDataView(Item item){
+		if(item == null){
+			encanBox.setSelectedItem(0);
+			titreTextField.setText("");
+			donateurTextField.setText("");
+			descriptionTextField.setText("");
+			noUniqueTextField.setText("");
+			noItemTextField.setText("");
+			valeurTextField.setText("");
+			prixDepartTextField.setText("");
+			incrementTextField.setText("");
+			achatImediatTextField.setText("");
+			photo.setText("");
+			fermeRadio.setSelected(false);
+			payeRadio.setSelected(false);
+		}
+		else{
+			encanBox.setSelectedItem(item.getNameEncan());
+			titreTextField.setText(item.getTitre());
+			donateurTextField.setText(item.getDonateur());
+			descriptionTextField.setText(item.getDescription());
+			noUniqueTextField.setText(item.getNoUnique()+"");
+			noItemTextField.setText(item.getNoItem()+"");
+			valeurTextField.setText(item.getValeur()+"");
+			prixDepartTextField.setText(item.getPrixDepart()+"");
+			incrementTextField.setText(item.getIncrement()+"");
+			achatImediatTextField.setText(item.getAchatImmediat()+"");
+			photo.setText(item.getImagePath());
+			fermeRadio.setSelected(item.isEstFerme());
+			payeRadio.setSelected(item.isEstPaye());
+		}
+	}
+	
+	private Item getDataView(){
+		return new Item(
+			encanBox.getSelectedItem().toString(),
+			titreTextField.getText(), 
+			donateurTextField.getText(),
+			descriptionTextField.getText(),
+			Integer.valueOf(noUniqueTextField.getText()), 
+			Integer.valueOf(noItemTextField.getText()),
+			Double.valueOf(valeurTextField.getText()), 
+			Double.valueOf(prixDepartTextField.getText()), 
+			Double.valueOf(incrementTextField.getText()), 
+			Double.valueOf(achatImediatTextField.getText()),
+			photo.getText(),
+			fermeRadio.isSelected(),
+			payeRadio.isSelected());
+	}
+
 	//##########################################################################################################
 	//						UTILISER "LOOK & FEEL" DU SYSTEME D'EXPLOITATION
 	//##########################################################################################################
@@ -336,6 +444,6 @@ public class MainPanel extends JFrame{
 		catch (UnsupportedLookAndFeelException e) {}
 		catch (IllegalAccessException e) {}
 	}
-	
+
 }
 
