@@ -442,9 +442,7 @@ public class MainPanel extends JFrame {
                     break;
 
                 case "Mettre à jour":
-                    System.out.println("Mettre à jour");
                     maj();
-                    controleur.updateItem(getDataView());
                     break;
 
                 case "Purger":
@@ -487,6 +485,7 @@ public class MainPanel extends JFrame {
             fermeRadio.setSelected(false);
             payeRadio.setSelected(false);
 
+            updateButton.setEnabled(false);
             supprimerButton.setEnabled(false);
         } else {
             encanBox.setSelectedItem(item.getNameEncan());
@@ -504,6 +503,7 @@ public class MainPanel extends JFrame {
             payeRadio.setSelected(item.isEstPaye());
 
             supprimerButton.setEnabled(true);
+            updateButton.setEnabled(true);
             itemSelected = item;
         }
 
@@ -649,6 +649,16 @@ public class MainPanel extends JFrame {
         if (!isDataViewCorrect()) {
             return;
         }
+        int noUnique = Integer.parseInt(noUniqueTextField.getText());
+        if (existeNoUnique(noUnique)) {
+            JOptionPane.showMessageDialog(null, "Le numéro unique de l'item existe déjà.");
+            return;
+        }
+        int noItem = Integer.parseInt(noItemTextField.getText());
+        if (existeNoItem(encanBox.getSelectedItem().toString(), noItem)) {
+            JOptionPane.showMessageDialog(null, "Le numéro d'item exite déjà pour cet encan.");
+            return;
+        }
 
         Item item = getDataView();
         ajouterItemBD(item);
@@ -684,10 +694,9 @@ public class MainPanel extends JFrame {
 
         String noUniqueText = noUniqueTextField.getText();
         String noItemText = noItemTextField.getText();
-        int noUnique = 0;
         int noItem = 0;
         try {
-            noUnique = Integer.parseInt(noUniqueText);
+            Integer.parseInt(noUniqueText);
         } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(null, "Le numéro unique de l'item est mal formaté.");
             return false;
@@ -696,14 +705,6 @@ public class MainPanel extends JFrame {
             noItem = Integer.parseInt(noItemText);
         } catch (NumberFormatException e) {
             JOptionPane.showMessageDialog(null, "Le numéro d'item est mal formaté.");
-            return false;
-        }
-
-        if (existeNoUnique(noUnique)) {
-            JOptionPane.showMessageDialog(null, "Le numéro unique de l'item existe déjà.");
-            return false;
-        } else if (existeNoItem(encanBox.getSelectedItem().toString(), noItem)) {
-            JOptionPane.showMessageDialog(null, "Le numéro d'item exite déjà pour cet encan.");
             return false;
         }
 
@@ -814,7 +815,140 @@ public class MainPanel extends JFrame {
     }
 
     private void maj() {
-        isDataViewCorrect();
+        if (!isDataViewCorrect()) {
+            return;
+        }
+        int noItem = Integer.parseInt(noItemTextField.getText());
+        if ((noItem != itemSelected.getNoItem())
+                && (existeNoItem(itemSelected.getNameEncan(), noItem))) {
+            JOptionPane.showMessageDialog(null, "Ce numéro d'item existe déjà pour l'encan '"
+                    + itemSelected.getNameEncan() + "'.");
+            return;
+        }
+
+        Item newItem = new Item(itemSelected.getNameEncan(), itemSelected.getTitre(), itemSelected.getDonateur(),
+                itemSelected.getDescription(), itemSelected.getNoUnique(), itemSelected.getNoItem(), itemSelected.getValeur(),
+                itemSelected.getPrixDepart(), itemSelected.getIncrement(), itemSelected.getAchatImmediat(), itemSelected.getImagePath(),
+                itemSelected.isEstFerme(), itemSelected.isEstPaye());
+        String requeteSQL = "select NO_ENCAN from ENCAN where NOM_ENC = '" + itemSelected.getNameEncan() + "'";
+        int noEncan = 0;
+        try {
+            ResultSet rs = stmt.executeQuery(requeteSQL);
+            rs.next();
+            noEncan = rs.getInt(1);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        int nbChangement = 0;
+        requeteSQL = "update ITEM set ";
+        if (!encanBox.getSelectedItem().toString().equals(itemSelected.getNameEncan())) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "NO_ENCAN = " + noEncan;
+            nbChangement++;
+            newItem.setNameEncan(encanBox.getSelectedItem().toString());
+        }
+        if (noItem != itemSelected.getNoItem()) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "NO_ITEM_ENCAN_ITE = " + noItem;
+            nbChangement++;
+            newItem.setNoItem(noItem);
+        }
+        if (!titreTextField.getText().equals(itemSelected.getTitre())) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "TITRE_ITE = '" + titreTextField.getText() + "'";
+            nbChangement++;
+            newItem.setTitre(titreTextField.getText());
+        }
+        if (!descriptionTextField.getText().equals(itemSelected.getDescription())) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "DESC_ITE = '" + descriptionTextField.getText() + "'";
+            nbChangement++;
+            newItem.setDescription(descriptionTextField.getText());
+        }
+        if (!donateurTextField.getText().equals(itemSelected.getDonateur())) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "DONATEUR_ITE = '" + donateurTextField.getText() + "'";
+            nbChangement++;
+            newItem.setDonateur(donateurTextField.getText());
+        }
+
+        if (Double.valueOf(valeurTextField.getText()) != itemSelected.getValeur()) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "MNT_VALEUR_ITE = " + Double.valueOf(valeurTextField.getText());
+            nbChangement++;
+            newItem.setValeur(Double.valueOf(valeurTextField.getText()));
+        }
+        if (Double.valueOf(prixDepartTextField.getText()).equals(itemSelected.getValeur())) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "MNT_PRIX_DEPART_ITE = " + Double.valueOf(prixDepartTextField.getText());
+            nbChangement++;
+            newItem.setPrixDepart(Double.valueOf(prixDepartTextField.getText()));
+        }
+        if (Double.valueOf(incrementTextField.getText()).equals(itemSelected.getValeur())) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "MNT_INCREMENT_MINI_ITE = " + Double.valueOf(incrementTextField.getText());
+            nbChangement++;
+            newItem.setIncrement(Double.valueOf(incrementTextField.getText()));
+        }
+        if (Double.valueOf(achatImediatTextField.getText()).equals(itemSelected.getValeur())) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "MNT_ACHAT_IMMEDIAT_ITE = " + Double.valueOf(achatImediatTextField.getText());
+            nbChangement++;
+            newItem.setAchatImmediat(Double.valueOf(achatImediatTextField.getText()));
+        }
+
+        if (fermeRadio.isSelected() != itemSelected.isEstFerme()) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "EST_FERME_ITE = " + (fermeRadio.isSelected() ? 1 : 0);
+            nbChangement++;
+            newItem.setEstFerme(fermeRadio.isSelected());
+        }
+        if (payeRadio.isSelected() != itemSelected.isEstPaye()) {
+            if (nbChangement > 0) {
+                requeteSQL += ", ";
+            }
+            requeteSQL += "EST_PAYE_ITE = " + (payeRadio.isSelected() ? 1 : 0);
+            nbChangement++;
+            newItem.setEstPaye(payeRadio.isSelected());
+        }
+        requeteSQL += " where NO_ITEM = " + itemSelected.getNoItem();
+
+        if (nbChangement == 0) {
+            return;
+        }
+
+        try {
+            stmt.executeUpdate(requeteSQL);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        listItems.remove(itemSelected);
+        listItems.add(newItem);
+
+        JOptionPane.showMessageDialog(null, "L'item '" + itemSelected.getTitre() + "' a été mis à jour.");
+        updateDataView(newItem);
+        updateDataTable(listItems);
     }
 
     private void annuler() {
